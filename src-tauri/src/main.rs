@@ -234,18 +234,19 @@ fn main() {
             _ => {}
         })
         .setup(|app| {
-            // let window = app.get_window("main").unwrap();
+            let window = app.get_window("main").unwrap();
             // // this is a workaround for the window to always show in current workspace.
             // // see https://github.com/tauri-apps/tauri/issues/2801
-            // window.set_always_on_top(true).unwrap();
-            // watch out! forever loop, every 5s emit an event
-            // to the JS side, which has to subscribe on the event ID.
-
+            window.set_always_on_top(true).unwrap();
+            
             let tray_handle_original =
                 Arc::new(app.app_handle().tray_handle_by_id(tray_id).unwrap());
 
             let tray_handle = tray_handle_original.clone();
 
+            // left/right click events are not currently supported in linux, which could have been a way 
+            // to update the menu before display.
+            // since we can't do that, instead we will spawn an infinite thread that re-builds the menu every 3 seconds
             std::thread::spawn(move || loop {
                 println!("update loop");
 
