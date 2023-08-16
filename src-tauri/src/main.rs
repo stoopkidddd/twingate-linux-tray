@@ -6,19 +6,16 @@ use tauri::{
     SystemTraySubmenu,
 };
 
-use std::cell::RefCell;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use serde::Deserialize;
-use serde::Serialize;
 use serde_json;
+use std::process::Command;
 
 use arboard::Clipboard;
-
-use chrono::*;
 
 #[derive(Clone, Deserialize)]
 struct Alias {
@@ -65,6 +62,7 @@ const NUMBER_RESOURCES_ID: &str = "num_resources";
 const RESOURCE_ADDRESS_ID: &str = "resource_address";
 const COPY_ADDRESS_ID: &str = "copy_address";
 const AUTHENTICATE_ID: &str = "authenticate";
+const QUIT_ID: &str = "quit";
 
 fn start_resource_auth(auth_id: &str) {
     let resource_id = auth_id.split("-").last().unwrap();
@@ -77,9 +75,9 @@ fn start_resource_auth(auth_id: &str) {
         .position(|x| x.id == resource_id)
         .unwrap();
 
-    // TODO: not sure how to do sudo?
-    std::process::Command::new("twingate")
-        .args(["auth", &n.resources[idx].name])
+    // TODO: what do we do if pkexec isn't there?
+    Command::new("pkexec")
+        .args(["twingate", "auth", &n.resources[idx].name])
         .spawn()
         .unwrap();
 }
@@ -126,10 +124,18 @@ fn build_resource_menu(resource: &Resource) -> SystemTraySubmenu {
 }
 
 fn get_network_data() -> Network {
-    let mut tg_notifier = std::process::Command::new("twingate-notifier");
+    let status_cmd = &Command::new("twingate").arg("status").output().unwrap();
+    let status = std::str::from_utf8(&status_cmd.stdout).unwrap();
+
+    // TODO: should check for other status. Just assuming only not-running and online
+    if status == "not-running" {
+        // TODO: should check for failure here
+        let _ = Command::new("twingate").arg("start").output();
+    }
+
+    let mut tg_notifier = Command::new("twingate-notifier");
 
     // TODO: need to handle when twingate isn't started
-
     serde_json::from_slice(&tg_notifier.arg("resources").output().unwrap().stdout).unwrap()
 }
 
@@ -148,6 +154,7 @@ fn build_menu() -> SystemTrayMenu {
             STOP_SERVICE_ID,
             "Stop Twingate Service",
         ))
+        .add_item(CustomMenuItem::new(QUIT_ID, "Close Tray"))
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(
             CustomMenuItem::new(
@@ -169,7 +176,7 @@ fn build_menu() -> SystemTrayMenu {
         .filter(|r| !r.is_visible_in_client)
         .collect();
 
-    // library doesn't supprt nested submenu's, so we will just add separator and extra header
+    // library doesn't supprt nested submenus =(, so we will just add separator and extra header
     menu = menu
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(
@@ -216,8 +223,8 @@ fn main() {
                     std::process::exit(0);
                 }
                 STOP_SERVICE_ID => {
-                    std::process::Command::new("twingate")
-                        .arg("stop")
+                    Command::new("pkexec")
+                        .args(["twingate", "stop"])
                         .spawn()
                         .unwrap();
                 }
@@ -227,29 +234,22 @@ fn main() {
                 auth_id if auth_id.contains(AUTHENTICATE_ID) => {
                     start_resource_auth(auth_id);
                 }
-                y => {
-                    println!("y: {}", y);
+                unfound => {
+                    println!("unfound: {}", unfound);
                 }
             },
             _ => {}
         })
         .setup(|app| {
-            let window = app.get_window("main").unwrap();
-            // // this is a workaround for the window to always show in current workspace.
-            // // see https://github.com/tauri-apps/tauri/issues/2801
-            window.set_always_on_top(true).unwrap();
-            
             let tray_handle_original =
                 Arc::new(app.app_handle().tray_handle_by_id(tray_id).unwrap());
 
             let tray_handle = tray_handle_original.clone();
 
             // left/right click events are not currently supported in linux, which could have been a way 
-            // to update the menu before display.
+            // to update the menu before being display.
             // since we can't do that, instead we will spawn an infinite thread that re-builds the menu every 3 seconds
             std::thread::spawn(move || loop {
-                println!("update loop");
-
                 let _ = tray_handle.set_menu(build_menu());
 
                 thread::sleep(Duration::from_secs(3));
