@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "twingate-linux-tray",
-    "version": "0.0.1"
+    "version": "0.0.2"
   },
   "tauri": {
     "systemTray": {
@@ -36,7 +36,9 @@
     },
     "security": {
       "csp": null
+    },
+    "updater": {
+      "active": false
     }
-    
   }
 }

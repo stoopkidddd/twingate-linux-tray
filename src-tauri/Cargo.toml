@@ -1,6 +1,6 @@
 [package]
 name = "twingate-linux-tray"
-version = "0.0.1"
+version = "0.0.2"
 description = "Twingate Linux Tray App wrapper around CLI"
 authors = ["you"]
 license = ""
