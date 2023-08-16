@@ -34,9 +34,6 @@ jobs:
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
-        with:
-          includeUpdaterJson: false
-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -45,3 +42,4 @@ jobs:
           releaseBody: 'See the assets to download and install this version.'
           releaseDraft: true
           prerelease: false
+          includeUpdaterJson: false
